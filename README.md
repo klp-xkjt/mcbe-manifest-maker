@@ -48,11 +48,125 @@ node tests/generator.test.mjs
 
 生成器会给出针对性校验：例如行为包不允许 `resources` 模块、皮肤包应使用 `format_version` 1、世界模板必须设置 `lock_template_options` 等。
 
+## 各类型清单 JSON 结构对照
+
+以下是 Microsoft Learn 官方示例中每种包类型的最小清单结构：
+
+**行为包（Behavior Pack）**
+
+```json
+{
+  "format_version": 2,
+  "header": {
+    "description": "Example vanilla behavior pack",
+    "name": "Vanilla Behavior Pack",
+    "uuid": "<FIRST GENERATED UUID>",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 20, 0]
+  },
+  "modules": [
+    { "description": "...", "type": "data", "uuid": "<SECOND UUID>", "version": [1, 0, 0] },
+    { "description": "...", "type": "client_data", "uuid": "<THIRD UUID>", "version": [1, 0, 0] }
+  ],
+  "dependencies": [
+    { "uuid": "<RESOURCE PACK UUID>", "version": [1, 0, 0] },
+    { "module_name": "@minecraft/server", "version": "1.9.0" }
+  ],
+  "metadata": { "authors": ["exampleAuthor"], "license": "MIT" }
+}
+```
+
+**资源包（Resource Pack）**
+
+```json
+{
+  "format_version": 2,
+  "header": {
+    "description": "Example vanilla resource pack",
+    "name": "Vanilla Resource Pack",
+    "uuid": "<FIRST GENERATED UUID>",
+    "pack_scope": "world",
+    "version": [1, 0, 0],
+    "min_engine_version": [1, 20, 0]
+  },
+  "modules": [
+    { "description": "...", "type": "resources", "uuid": "<SECOND UUID>", "version": [1, 0, 0] }
+  ]
+}
+```
+
+**皮肤包（Skin Pack）**
+
+```json
+{
+  "format_version": 1,
+  "header": {
+    "name": "pack.name",
+    "uuid": "<FIRST GENERATED UUID>",
+    "version": [1, 0, 0]
+  },
+  "modules": [
+    { "type": "skin_pack", "uuid": "<SECOND UUID>", "version": [1, 0, 0] }
+  ]
+}
+```
+
+**世界模板（World Template）**
+
+```json
+{
+  "format_version": 2,
+  "header": {
+    "name": "pack.name",
+    "description": "pack.description",
+    "version": [1, 0, 0],
+    "uuid": "<FIRST GENERATED UUID>",
+    "allow_random_seed": true,
+    "base_game_version": [1, 20, 0],
+    "lock_template_options": true
+  },
+  "modules": [
+    { "type": "world_template", "uuid": "<SECOND UUID>", "version": [1, 0, 0] }
+  ]
+}
+```
+
+### 各部分差异矩阵
+
+| JSON 部分 | 行为包 | 资源包 | 皮肤包 | 世界模板 |
+| --- | --- | --- | --- | --- |
+| `format_version` | 2 | 2 | 1 | 2 |
+| `header.name` | ✅ | ✅ | ✅ | ✅ |
+| `header.description` | ✅ 可选 | ✅ 可选 | ❌ 官方模板无 | ✅ 常用 |
+| `header.uuid` / `version` | ✅ | ✅ | ✅ | ✅ |
+| `header.min_engine_version` | ✅ 必需 | ✅ 必需 | ❌ | 可选 |
+| `header.pack_scope` | ❌ | ✅ 可选 | ❌ | ❌ |
+| `header.base_game_version` | ❌ | ❌ | ❌ | ✅ 推荐 |
+| `header.lock_template_options` | ❌ | ❌ | ❌ | ✅ 必需 |
+| `header.allow_random_seed` | ❌ | ❌ | ❌ | ✅ 可选 |
+| `modules[].type` | `data` / `client_data` / `script` | `resources` | `skin_pack` | `world_template` |
+| `dependencies` | ✅ 常用（关联资源包 / 脚本模块） | 一般无 | ❌ | ❌ |
+| `capabilities` | 按需 | 按需 | ❌ | 按需 |
+| `metadata` | ✅ 可选 | ✅ 可选 | ❌ | 可选 |
+
+要点：
+
+- 只有行为包和资源包**必须**有 `min_engine_version`；
+- 只有资源包有 `pack_scope`；
+- 只有世界模板有 `base_game_version`、`lock_template_options`、`allow_random_seed`；
+- 只有行为包常见 `dependencies`（关联配套资源包，或声明 `@minecraft/server` 等脚本模块）；
+- 皮肤包结构最简单：只有 `name` / `uuid` / `version` 加一个 `skin_pack` 模块；
+- `capabilities` 与 `metadata` 是可选顶层部分，官方最小示例中通常不出现；
+- v3（预览版）中所有版本号改为 SemVer 字符串，并可附加 `settings` 部分。
+
 ## 规范来源
 
 - [Add-Ons Reference: manifest.json](https://learn.microsoft.com/minecraft/creator/reference/content/addonsreference/packmanifest)（Microsoft Learn，经由 Microsoft Learn MCP 检索确认）
 - [Pack Manifest Documentation](https://learn.microsoft.com/minecraft/creator/reference/content/manifestreference/packmanifestdocument)
+- [manifest.json 示例（Add-Ons Reference）](https://learn.microsoft.com/minecraft/creator/reference/content/addonsreference/examples/addonmanifest)
 - [Comprehensive List of Add-On Pack Contents](https://learn.microsoft.com/minecraft/creator/documents/comprehensivepackcontents)（各类型 manifest 对照示例）
 - [Packaging a Skin Pack](https://learn.microsoft.com/minecraft/creator/documents/packagingaskinpack)
 - [Introduction to Behavior Packs (from Scratch)](https://learn.microsoft.com/minecraft/creator/documents/behaviorpackfromscratch)
 - [Introduction to Resource Packs](https://learn.microsoft.com/minecraft/creator/documents/resourcepack)
+- [Create a World Template from an Exported World](https://learn.microsoft.com/minecraft/creator/documents/createaworldtemplate)
+- [Introduction to Scripting in Minecraft](https://learn.microsoft.com/minecraft/creator/documents/scripting/introduction)
