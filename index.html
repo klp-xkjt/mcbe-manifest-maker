@@ -191,6 +191,10 @@
           <button class="btn small" onclick="refreshUuid('packUuid')">重新生成</button>
         </div>
       </div>
+      <div class="btn-row" style="margin-top:-4px">
+        <button class="btn" onclick="regenerateAllUuids()">♻ 一键重新生成全部 UUID</button>
+        <span class="note" style="margin:0;align-self:center">包、模块、依赖的 UUID 都会自动填充</span>
+      </div>
       <div class="row-3">
         <div class="field"><label for="verMajor">版本 major</label><input id="verMajor" type="number" min="0" value="1"></div>
         <div class="field"><label for="verMinor">版本 minor</label><input id="verMinor" type="number" min="0" value="0"></div>
@@ -341,7 +345,7 @@
     </div>
     <div class="dep-pack-fields">
       <div class="field" style="margin-bottom:12px">
-        <label>依赖包的 UUID（与该包 header.uuid 一致）</label>
+        <label>依赖包的 UUID（需与对应资源包 header.uuid 一致，已自动填充请核对）</label>
         <input class="dep-uuid" spellcheck="false" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
       </div>
       <div class="row-3">
@@ -524,7 +528,8 @@ function refreshModuleTypeOptions() {
 function addDepRow(kind, uuid, ver, moduleName, scriptVersion) {
   const tpl = $("depTemplate").content.firstElementChild.cloneNode(true);
   if (kind) tpl.querySelector(".dep-kind").value = kind;
-  if (uuid) tpl.querySelector(".dep-uuid").value = uuid;
+  const isPack = kind === undefined ? tpl.querySelector(".dep-kind").value === "pack" : kind === "pack";
+  tpl.querySelector(".dep-uuid").value = uuid || (isPack ? uuidv4() : "");
   if (ver && ver.length === 3) {
     tpl.querySelector(".dep-ver-major").value = ver[0];
     tpl.querySelector(".dep-ver-minor").value = ver[1];
@@ -534,6 +539,17 @@ function addDepRow(kind, uuid, ver, moduleName, scriptVersion) {
   if (scriptVersion) tpl.querySelector(".dep-script-version").value = scriptVersion;
   $("depList").appendChild(tpl);
   updateDepVisibility(tpl);
+}
+
+function regenerateAllUuids() {
+  $("packUuid").value = uuidv4();
+  document.querySelectorAll(".module-item .mod-uuid").forEach((input) => {
+    input.value = uuidv4();
+  });
+  document.querySelectorAll(".dep-item .dep-uuid").forEach((input) => {
+    input.value = uuidv4();
+  });
+  render();
 }
 
 function addSettingRow(item) {

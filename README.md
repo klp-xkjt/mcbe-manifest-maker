@@ -15,9 +15,10 @@
 直接用浏览器打开 [index.html](index.html) 即可，无需安装依赖、无需联网。
 
 1. 在左侧表单填写包名称、描述、UUID（可自动生成）、版本等信息；
-2. 按需添加/删除模块（modules）、依赖（dependencies）、能力（capabilities）与元数据（metadata）；
-3. 右侧实时预览生成的 `manifest.json`，点击「复制 JSON」或「下载 manifest.json」即可；
-4. 也可以点「行为包示例 / 资源包示例 / 皮肤包示例」一键载入官方模板再修改。
+2. UUID 会自动填充：新建模块/包依赖时自动生成，也可点「一键重新生成全部 UUID」整体刷新；
+3. 按需添加/删除模块（modules）、依赖（dependencies）、能力（capabilities）与元数据（metadata）；
+4. 右侧实时预览生成的 `manifest.json`，点击「复制 JSON」或「下载 manifest.json」即可；
+5. 也可以点「行为包示例 / 资源包示例 / 皮肤包示例」一键载入官方模板再修改。
 
 运行测试（需 Node.js）：
 
