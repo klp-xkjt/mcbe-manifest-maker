@@ -26,6 +26,7 @@
     color: var(--text);
     font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
     line-height: 1.55;
+    overflow-x: hidden;
   }
   header {
     padding: 22px 28px;
@@ -45,6 +46,19 @@
   @media (max-width: 980px) {
     main { grid-template-columns: 1fr; padding: 14px; }
   }
+  @media (max-width: 560px) {
+    .row-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { padding: 12px; }
+    .output-panel .card { padding: 12px; }
+  }
+  @media (max-width: 400px) {
+    .row { grid-template-columns: 1fr; }
+    .row-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .btn { padding: 6px 9px; font-size: 12px; }
+    header { padding: 16px; }
+    main { padding: 10px; }
+  }
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -59,6 +73,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
   .card h2 .hint { color: var(--muted); font-weight: normal; font-size: 12px; }
   .card h2 .doc-link {
@@ -87,8 +102,13 @@
   .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .field { min-width: 0; }
-  .uuid-field { display: flex; gap: 6px; }
-  .uuid-field input { font-family: Consolas, monospace; }
+  .uuid-field { display: flex; gap: 6px; min-width: 0; }
+  .uuid-field input {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    font-family: Consolas, monospace;
+  }
   .btn {
     background: var(--panel-2);
     border: 1px solid var(--border);
