@@ -4,6 +4,10 @@
 
 > 🤖 本项目由 AI（DeepSeek-V4-Flash）生成
 
+## 仓库
+
+GitHub：<https://github.com/klp-xkjt/mcbe-manifest-maker>
+
 ## 项目信息
 
 - 项目类型：AI 生成（AI-generated）
