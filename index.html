@@ -116,7 +116,7 @@
   #warnings { margin: 0 0 10px; padding: 0; list-style: none; font-size: 13px; }
   #warnings li { color: var(--warn); margin-bottom: 3px; }
   #warnings li::before { content: "⚠ "; }
-  #output {
+  #output, #bpOutput, #rpOutput {
     background: var(--code-bg);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -145,7 +145,7 @@
 <main>
   <section>
     <div class="card">
-      <h2>① 预设 <span class="hint">载入官方示例并自动刷新 UUID</span></h2>
+      <h2>① 预设 <span class="hint">联动模式下：行为包示例→行为包，资源包示例→资源包，皮肤包示例→退出联动</span></h2>
       <div class="btn-row">
         <button class="btn primary" onclick="loadPreset('behavior')">行为包示例</button>
         <button class="btn primary" onclick="loadPreset('resource')">资源包示例</button>
@@ -1037,7 +1037,43 @@ const PRESETS = {
 };
 
 function loadPreset(name) {
+  if ($("dualMode").checked) {
+    if (name === "behavior") {
+      /* 联动模式下：行为包示例只填充主表单（行为包一侧） */
+      applyManifest(PRESETS.behavior);
+      render();
+      return;
+    }
+    if (name === "resource") {
+      /* 联动模式下：资源包示例只填充资源包一侧 */
+      applyRpPreset(PRESETS.resource);
+      return;
+    }
+    if (name === "skin") {
+      /* 皮肤包不能与资源包联动，载入时自动退出联动模式 */
+      $("dualMode").checked = false;
+      syncVisibility();
+    }
+  }
   applyManifest(PRESETS[name]);
+  render();
+}
+
+function applyRpPreset(p) {
+  const h = p.header || {};
+  $("rpName").value = h.name || "";
+  $("rpDesc").value = h.description || "";
+  $("rpUuid").value = uuidv4();
+  const v = parseVersionString(h.version || [1, 0, 0]);
+  $("rpVerMajor").value = v[0] !== undefined ? v[0] : 1;
+  $("rpVerMinor").value = v[1] !== undefined ? v[1] : 0;
+  $("rpVerPatch").value = v[2] !== undefined ? v[2] : 0;
+  const mv = h.min_engine_version ? parseVersionString(h.min_engine_version) : null;
+  $("rpMinMajor").value = mv ? mv[0] : "";
+  $("rpMinMinor").value = mv ? mv[1] : "";
+  $("rpMinPatch").value = mv ? mv[2] : "";
+  $("rpScope").value = h.pack_scope || "world";
+  $("rpModuleUuid").value = uuidv4();
   render();
 }
 
