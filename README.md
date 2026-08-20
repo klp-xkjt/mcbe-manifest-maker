@@ -20,6 +20,15 @@
 4. 右侧实时预览生成的 `manifest.json`，点击「复制 JSON」或「下载 manifest.json」即可；
 5. 也可以点「行为包示例 / 资源包示例 / 皮肤包示例」一键载入官方模板再修改。
 
+## 行为包 + 资源包联动生成
+
+很多 Add-on 需要行为包和资源包成对发布，勾选「⑧ 通用附加包联动生成」即可一次生成两份清单：
+
+1. 主表单作为行为包填写（模块、依赖等照常配置）；
+2. 联动区块里单独填写资源包名称、UUID、版本等信息（首次开启会自动从行为包复制默认值并生成全新 UUID）；
+3. 默认自动在行为包 `dependencies` 里绑定资源包（`uuid` + `version`），这样玩家加载行为包时会自动加载配套资源包；取消勾选「自动绑定」可关闭；
+4. 输出面板分别展示行为包与资源包的 JSON，可单独复制或下载。
+
 运行测试（需 Node.js）：
 
 ```powershell
@@ -35,6 +44,8 @@ node tests/generator.test.mjs
 - `capabilities`：`chemistry`、`editorExtension`、`experimental_custom_ui`、`raytraced`、`pbr`
 - `metadata`：`authors`、`license`、`url`、`product_type`、`generated_with`
 - `settings`：v3 预览版的 `label` / `toggle` / `slider` 设置项
+
+脚本模块依赖的版本支持 SemVer 可选后缀（官方 Script Module Versioning），如 `1.9.0`、`1.2.0-beta`、`1.4.0-internal`。
 
 ## 各类型清单的字段差异
 

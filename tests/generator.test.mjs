@@ -63,7 +63,7 @@ const factory = new Function(
   "document",
   "window",
   "navigator",
-  js + "\n;return { buildManifest, applyManifest, uuidv4 };"
+  js + "\n;return { buildManifest, applyManifest, buildResourcePackManifest, bindResourcePackDependency, uuidv4 };"
 );
 const api = factory(documentStub, windowStub, navigatorStub);
 
@@ -124,6 +124,63 @@ assert.equal(manifest.dependencies[1].module_name, "@minecraft/server");
 assert.deepEqual(manifest.metadata.authors, ["exampleAuthor"]);
 assert.deepEqual(manifest.metadata.generated_with.example_tool, ["1.0.0", "1.1.0"]);
 assert.doesNotThrow(() => JSON.stringify(manifest), "输出必须是合法 JSON");
+assert.deepEqual(
+  manifest,
+  {
+    format_version: 2,
+    header: {
+      name: "Vanilla Behavior Pack",
+      uuid: "ee649bcf-256c-4013-9068-6a802b89d756",
+      description: "Example vanilla behavior pack",
+      version: [1, 0, 0],
+      min_engine_version: [1, 20, 0]
+    },
+    modules: [
+      {
+        type: "data",
+        uuid: "fa6e90c8-c925-460f-8155-c8a60b753caa",
+        version: [1, 0, 0],
+        description: "Example behavior pack module"
+      },
+      {
+        type: "client_data",
+        uuid: "c05a992e-482a-455f-898c-58bbb4975e47",
+        version: [1, 0, 0],
+        description: "Example client scripts module"
+      }
+    ],
+    dependencies: [
+      { uuid: "66c6e9a8-3093-462a-9c36-dbb052165822", version: [1, 0, 0] },
+      { module_name: "@minecraft/server", version: "1.9.0" }
+    ],
+    metadata: {
+      authors: ["exampleAuthor"],
+      license: "MIT",
+      url: "http://www.contoso.com",
+      generated_with: { example_tool: ["1.0.0", "1.1.0"] }
+    }
+  },
+  "行为包输出应与官方示例结构完全一致"
+);
+
+/* 脚本模块依赖版本支持 -beta / -internal 后缀（官方 Script Module Versioning） */
+depRows.length = 0;
+const scriptVerEl = mkEl("1.2.0-beta");
+depRows.push(
+  mkRow({
+    ".dep-kind": "script",
+    ".dep-module-name": "@minecraft/server",
+    ".dep-script-version": scriptVerEl
+  })
+);
+({ warnings } = api.buildManifest());
+assert.deepEqual(warnings, [], "beta 版本后缀应被接受");
+scriptVerEl.value = "1.4.0-internal";
+({ warnings } = api.buildManifest());
+assert.deepEqual(warnings, [], "internal 版本后缀应被接受");
+scriptVerEl.value = "1.9";
+({ warnings } = api.buildManifest());
+assert.ok(warnings.some((w) => w.includes("SemVer")), "缺少 patch 版本号应提示");
 
 /* ---- 用例 2：v3 预览（SemVer 字符串 + settings + capabilities） ---- */
 set("formatVersion", "3");
@@ -162,6 +219,10 @@ assert.equal(manifest.header.min_engine_version, "1.21.0", "v3 min_engine_versio
 assert.equal(manifest.modules[0].language, "javascript");
 assert.deepEqual(manifest.capabilities, ["chemistry"]);
 assert.deepEqual(manifest.settings, [{ type: "toggle", text: "Enable something", name: "my_toggle", default: true }]);
+set("metaAuthors", "");
+({ warnings } = api.buildManifest());
+assert.ok(warnings.some((w) => w.includes("authors")), "v3 预览版应提示 metadata.authors 必填");
+set("metaAuthors", "exampleAuthor");
 
 /* ---- 用例 3：校验错误 ---- */
 set("packUuid", "not-a-uuid");
@@ -286,5 +347,81 @@ assert.equal(manifest.header.pack_scope, "world");
 assert.equal(manifest.modules[0].type, "resources");
 assert.equal(manifest.dependencies, undefined, "资源包不应输出 dependencies");
 assert.deepEqual(manifest.capabilities, ["pbr"], "资源包允许 capabilities");
+
+/* 与官方资源包示例结构完全一致（清空可选元数据后） */
+caps.length = 0;
+set("packName", "Vanilla Resource Pack");
+set("packDesc", "Example vanilla resource pack");
+set("packUuid", "66c6e9a8-3093-462a-9c36-dbb052165822");
+set("minMajor", 1); set("minMinor", 20); set("minPatch", 0);
+moduleRows.length = 0;
+moduleRows.push(
+  mkRow({
+    ".mod-type": "resources",
+    ".mod-uuid": "743f6949-53be-44b6-b326-398005028819",
+    ".mod-desc": "Example vanilla resource pack",
+    ".mod-ver-major": 1, ".mod-ver-minor": 0, ".mod-ver-patch": 0
+  })
+);
+set("metaAuthors", ""); set("metaLicense", ""); set("metaUrl", "");
+set("genTool", ""); set("genVersions", "");
+({ manifest, warnings } = api.buildManifest());
+assert.deepEqual(warnings, []);
+assert.deepEqual(
+  manifest,
+  {
+    format_version: 2,
+    header: {
+      name: "Vanilla Resource Pack",
+      uuid: "66c6e9a8-3093-462a-9c36-dbb052165822",
+      description: "Example vanilla resource pack",
+      pack_scope: "world",
+      version: [1, 0, 0],
+      min_engine_version: [1, 20, 0]
+    },
+    modules: [
+      {
+        type: "resources",
+        uuid: "743f6949-53be-44b6-b326-398005028819",
+        version: [1, 0, 0],
+        description: "Example vanilla resource pack"
+      }
+    ]
+  },
+  "资源包输出应与官方示例结构完全一致"
+);
+
+/* ---- 用例 8：联动生成 —— 资源包清单构建 + 依赖绑定 ---- */
+set("formatVersion", "2");
+set("rpName", "Vanilla Resource Pack");
+set("rpDesc", "Example vanilla resource pack");
+set("rpUuid", "66c6e9a8-3093-462a-9c36-dbb052165822");
+set("rpVerMajor", 1); set("rpVerMinor", 0); set("rpVerPatch", 0);
+set("rpMinMajor", 1); set("rpMinMinor", 20); set("rpMinPatch", 0);
+set("rpScope", "world");
+set("rpModuleUuid", "743f6949-53be-44b6-b326-398005028819");
+const rpResult = api.buildResourcePackManifest();
+const rpManifest = rpResult.manifest;
+const rpWarnings = rpResult.warnings;
+assert.deepEqual(rpWarnings, [], "资源包清单不应有警告");
+assert.deepEqual(rpManifest.modules[0].description, "Example vanilla resource pack");
+assert.equal(rpManifest.header.pack_scope, "world");
+
+const bpSample = {
+  format_version: 2,
+  header: { name: "BP", uuid: "11111111-1111-4111-8111-111111111111" },
+  modules: [],
+  dependencies: [{ module_name: "@minecraft/server", version: "1.9.0" }]
+};
+api.bindResourcePackDependency(bpSample, rpManifest);
+assert.equal(bpSample.dependencies.length, 2);
+assert.equal(bpSample.dependencies[0].uuid, "66c6e9a8-3093-462a-9c36-dbb052165822");
+assert.deepEqual(bpSample.dependencies[0].version, [1, 0, 0]);
+api.bindResourcePackDependency(bpSample, rpManifest);
+assert.equal(bpSample.dependencies.length, 2, "重复绑定同一资源包不应重复添加");
+
+set("rpUuid", "bad-uuid");
+const badRpWarnings = api.buildResourcePackManifest().warnings;
+assert.ok(badRpWarnings.some((w) => w.includes("资源包 UUID")), "资源包 UUID 无效应提示");
 
 console.log("All generator tests passed ✓");

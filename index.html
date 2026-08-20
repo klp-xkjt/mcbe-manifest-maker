@@ -271,6 +271,56 @@
       <button class="btn" onclick="addSettingRow()">＋ 添加设置项</button>
       <p class="note">类型：label（说明文字）、toggle（开关）、slider（滑块）。仅在 v3 清单中输出。</p>
     </div>
+
+    <div class="card" id="dualCard">
+      <h2>⑧ 通用附加包联动生成 <span class="hint">行为包 + 资源包一次生成</span></h2>
+      <label class="inline-label"><input id="dualMode" type="checkbox"> 同时生成行为包与资源包（主表单即行为包，自动绑定依赖）</label>
+      <div id="rpFields" class="hidden">
+        <div class="field" style="margin-bottom:12px">
+          <label for="rpName">资源包名称 name（必填）</label>
+          <input id="rpName" placeholder="My Awesome Pack RP">
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label for="rpDesc">资源包描述 description</label>
+          <input id="rpDesc" placeholder="A short description of the resource pack">
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label for="rpUuid">资源包 UUID header.uuid（必填，需唯一）</label>
+          <div class="uuid-field">
+            <input id="rpUuid" spellcheck="false">
+            <button class="btn small" onclick="refreshUuid('rpUuid')">重新生成</button>
+          </div>
+        </div>
+        <div class="row-3">
+          <div class="field"><label for="rpVerMajor">资源包版本 major</label><input id="rpVerMajor" type="number" min="0"></div>
+          <div class="field"><label for="rpVerMinor">资源包版本 minor</label><input id="rpVerMinor" type="number" min="0"></div>
+          <div class="field"><label for="rpVerPatch">资源包版本 patch</label><input id="rpVerPatch" type="number" min="0"></div>
+        </div>
+        <div class="row-3">
+          <div class="field"><label for="rpMinMajor">资源包最低引擎 major</label><input id="rpMinMajor" type="number" min="0"></div>
+          <div class="field"><label for="rpMinMinor">资源包最低引擎 minor</label><input id="rpMinMinor" type="number" min="0"></div>
+          <div class="field"><label for="rpMinPatch">资源包最低引擎 patch</label><input id="rpMinPatch" type="number" min="0"></div>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label for="rpScope">资源包 pack_scope</label>
+          <select id="rpScope">
+            <option value="world" selected>world（仅世界内）</option>
+            <option value="">不输出（等同 any）</option>
+            <option value="any">any（游戏与世界中均可）</option>
+            <option value="global">global（仅游戏全局）</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label for="rpModuleUuid">资源包模块 UUID（自动生成）</label>
+          <div class="uuid-field">
+            <input id="rpModuleUuid" spellcheck="false">
+            <button class="btn small" onclick="refreshUuid('rpModuleUuid')">重新生成</button>
+          </div>
+        </div>
+        <label class="inline-label"><input id="bindDep" type="checkbox" checked> 自动在行为包 dependencies 中绑定资源包（uuid + version）</label>
+        <p class="note">开启后，行为包 manifest 会自带一条指向资源包 UUID 的依赖，加载行为包时自动加载配套资源包。</p>
+      </div>
+    </div>
   </section>
 
   <section class="output-panel">
@@ -278,11 +328,31 @@
       <h2>生成的 manifest.json <span class="hint">实时预览</span></h2>
       <p id="status" class="ok">✓ 配置有效</p>
       <ul id="warnings"></ul>
-      <div class="btn-row">
-        <button class="btn primary" onclick="copyOutput()">复制 JSON</button>
-        <button class="btn primary" onclick="downloadOutput()">下载 manifest.json</button>
+
+      <div id="singleBlock">
+        <div class="btn-row">
+          <button class="btn primary" onclick="copyOutput()">复制 JSON</button>
+          <button class="btn primary" onclick="downloadOutput()">下载 manifest.json</button>
+        </div>
+        <pre id="output"></pre>
       </div>
-      <pre id="output"></pre>
+
+      <div id="dualBlock" class="hidden">
+        <h3 style="margin:0 0 8px;font-size:14px">行为包 manifest.json</h3>
+        <div class="btn-row">
+          <button class="btn primary" onclick="copyDual('bp')">复制行为包 JSON</button>
+          <button class="btn primary" onclick="downloadDual('bp')">下载行为包 manifest.json</button>
+        </div>
+        <pre id="bpOutput"></pre>
+        <h3 style="margin:16px 0 8px;font-size:14px">资源包 manifest.json</h3>
+        <div class="btn-row">
+          <button class="btn primary" onclick="copyDual('rp')">复制资源包 JSON</button>
+          <button class="btn primary" onclick="downloadDual('rp')">下载资源包 manifest.json</button>
+        </div>
+        <pre id="rpOutput"></pre>
+        <p class="note" id="dualBindNote"></p>
+      </div>
+
       <p class="note">参考文档：<a href="https://learn.microsoft.com/minecraft/creator/reference/content/addonsreference/packmanifest" target="_blank" rel="noopener">Add-Ons Reference: manifest.json（Microsoft Learn）</a></p>
     </div>
   </section>
@@ -360,8 +430,8 @@
         <input class="dep-module-name" placeholder="@minecraft/server">
       </div>
       <div class="field">
-        <label>版本 version（SemVer 字符串）</label>
-        <input class="dep-script-version" placeholder="1.9.0">
+          <label>版本 version（SemVer 字符串）</label>
+          <input class="dep-script-version" placeholder="1.9.0（支持 1.2.0-beta 等后缀）">
       </div>
     </div>
   </div>
@@ -418,7 +488,8 @@ function uuidv4() {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+/* 脚本模块版本支持可选后缀：1.9.0 / 1.2.0-beta / 1.4.0-internal */
+const SEMVER_RE = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
 
 /* 各包类型允许的模块类型（依据 Microsoft Learn 官方文档示例） */
 const MODULE_TYPES = {
@@ -467,6 +538,22 @@ function minEngineVersion() {
   const m = parseInt(val("minMajor"), 10);
   const i = parseInt(val("minMinor"), 10);
   const p = parseInt(val("minPatch"), 10);
+  if (isNaN(m) && isNaN(i) && isNaN(p)) return null;
+  return [isNaN(m) ? 0 : m, isNaN(i) ? 0 : i, isNaN(p) ? 0 : p];
+}
+
+function rpVersionObject() {
+  return {
+    major: parseInt(val("rpVerMajor"), 10) || 0,
+    minor: parseInt(val("rpVerMinor"), 10) || 0,
+    patch: parseInt(val("rpVerPatch"), 10) || 0
+  };
+}
+
+function rpMinEngineVersion() {
+  const m = parseInt(val("rpMinMajor"), 10);
+  const i = parseInt(val("rpMinMinor"), 10);
+  const p = parseInt(val("rpMinPatch"), 10);
   if (isNaN(m) && isNaN(i) && isNaN(p)) return null;
   return [isNaN(m) ? 0 : m, isNaN(i) ? 0 : i, isNaN(p) ? 0 : p];
 }
@@ -716,6 +803,9 @@ function buildManifest() {
         meta.generated_with = { [tool]: genVers.length ? genVers : ["1.0.0"] };
       }
     }
+    if (v3 && !authors.length) {
+      warnings.push("manifest v3（预览版）当前要求 metadata.authors 必填（官方说明的已知问题）。");
+    }
   }
 
   const settings = [];
@@ -767,9 +857,7 @@ function buildManifest() {
 }
 
 /* ---------- 渲染 ---------- */
-function render() {
-  const { manifest, warnings } = buildManifest();
-  $("output").textContent = JSON.stringify(manifest, null, 4) + "\n";
+function setStatus(warnings) {
   const status = $("status");
   const list = $("warnings");
   list.innerHTML = "";
@@ -787,6 +875,77 @@ function render() {
   }
 }
 
+function renderSingle() {
+  const { manifest, warnings } = buildManifest();
+  $("output").textContent = JSON.stringify(manifest, null, 4) + "\n";
+  setStatus(warnings);
+}
+
+function buildResourcePackManifest() {
+  const warnings = [];
+  const fmt = effectiveFormatVersion();
+  const v3 = fmt === 3;
+  const ver = [rpVersionObject().major, rpVersionObject().minor, rpVersionObject().patch];
+  const header = { name: val("rpName"), uuid: val("rpUuid") };
+  const desc = val("rpDesc");
+  if (desc) header.description = desc;
+  header.version = toVersion(ver, v3);
+  const minVer = rpMinEngineVersion();
+  if (minVer) header.min_engine_version = toVersion(minVer, v3);
+  else warnings.push("资源包必须填写 min_engine_version（header.min_engine_version）。");
+  if (val("rpScope")) header.pack_scope = val("rpScope");
+  if (fmt === 1) warnings.push("资源包应使用 format_version 2。");
+  if (!header.name) warnings.push("资源包名称（header.name）为必填项。");
+  if (!UUID_RE.test(header.uuid)) warnings.push("资源包 UUID（header.uuid）无效或为空。");
+  const moduleUuid = val("rpModuleUuid");
+  if (!UUID_RE.test(moduleUuid)) warnings.push("资源包模块 UUID 无效或为空。");
+  const modules = [{ type: "resources", uuid: moduleUuid, version: header.version }];
+  if (desc) modules[0].description = desc;
+  return { manifest: { format_version: fmt, header, modules }, warnings };
+}
+
+function bindResourcePackDependency(bp, rp) {
+  const dep = { uuid: rp.header.uuid, version: rp.header.version };
+  const deps = bp.dependencies || [];
+  if (!deps.some((d) => d.uuid && d.uuid.toLowerCase() === dep.uuid.toLowerCase())) {
+    deps.unshift(dep);
+  }
+  bp.dependencies = deps;
+  return bp;
+}
+
+function renderDual() {
+  const bp = buildManifest();
+  const rp = buildResourcePackManifest();
+  const warnings = [...bp.warnings, ...rp.warnings];
+  const note = $("dualBindNote");
+  if ($("bindDep").checked) {
+    if (UUID_RE.test(rp.manifest.header.uuid)) {
+      bindResourcePackDependency(bp.manifest, rp.manifest);
+      note.textContent = "已自动绑定：行为包 dependencies 引用了资源包 UUID（取消勾选可关闭）。";
+    } else {
+      note.textContent = "资源包 UUID 无效，未自动绑定依赖。";
+    }
+  } else {
+    note.textContent = "未启用自动依赖绑定。";
+  }
+  $("bpOutput").textContent = JSON.stringify(bp.manifest, null, 4) + "\n";
+  $("rpOutput").textContent = JSON.stringify(rp.manifest, null, 4) + "\n";
+  setStatus(warnings);
+}
+
+function render() {
+  if ($("dualMode").checked) {
+    $("singleBlock").classList.add("hidden");
+    $("dualBlock").classList.remove("hidden");
+    renderDual();
+  } else {
+    $("singleBlock").classList.remove("hidden");
+    $("dualBlock").classList.add("hidden");
+    renderSingle();
+  }
+}
+
 /* ---------- 联动显示 ---------- */
 function syncVisibility() {
   const type = val("packType");
@@ -799,7 +958,28 @@ function syncVisibility() {
   $("metaCard").classList.toggle("hidden", type === "skin");
   const fmt = effectiveFormatVersion();
   $("settingsCard").classList.toggle("hidden", fmt !== 3);
+  const dual = $("dualMode").checked;
+  $("rpFields").classList.toggle("hidden", !dual);
+  $("packType").disabled = dual;
+  if (dual) $("packType").value = "behavior";
   refreshModuleTypeOptions();
+}
+
+function seedRpDefaults() {
+  if (!$("rpUuid").value) $("rpUuid").value = uuidv4();
+  if (!$("rpModuleUuid").value) $("rpModuleUuid").value = uuidv4();
+  if (!$("rpName").value) $("rpName").value = val("packName") ? `${val("packName")} RP` : "";
+  if (!$("rpDesc").value) $("rpDesc").value = val("packDesc");
+  if ($("rpVerMajor").value === "" && $("verMajor").value !== "") {
+    $("rpVerMajor").value = $("verMajor").value;
+    $("rpVerMinor").value = $("verMinor").value;
+    $("rpVerPatch").value = $("verPatch").value;
+  }
+  if ($("rpMinMajor").value === "" && $("minMajor").value !== "") {
+    $("rpMinMajor").value = $("minMajor").value;
+    $("rpMinMinor").value = $("minMinor").value;
+    $("rpMinPatch").value = $("minPatch").value;
+  }
 }
 
 /* ---------- 预设 ---------- */
@@ -948,16 +1128,22 @@ function resetAll() {
   $("metaAuthors").value = ""; $("metaLicense").value = ""; $("metaUrl").value = "";
   $("metaProductType").checked = false;
   $("genTool").value = ""; $("genVersions").value = "";
+  $("dualMode").checked = false;
+  $("rpName").value = ""; $("rpDesc").value = ""; $("rpUuid").value = "";
+  $("rpVerMajor").value = ""; $("rpVerMinor").value = ""; $("rpVerPatch").value = "";
+  $("rpMinMajor").value = ""; $("rpMinMinor").value = ""; $("rpMinPatch").value = "";
+  $("rpScope").value = "world";
+  $("rpModuleUuid").value = "";
+  $("bindDep").checked = true;
   syncVisibility();
   render();
 }
 
 /* ---------- 复制 / 下载 ---------- */
-function copyOutput() {
-  const text = $("output").textContent;
+function copyText(text, okMessage) {
   const done = () => {
     const st = $("status");
-    st.textContent = "✓ 已复制到剪贴板";
+    st.textContent = okMessage || "✓ 已复制到剪贴板";
     st.className = "ok";
     setTimeout(render, 1800);
   };
@@ -966,6 +1152,17 @@ function copyOutput() {
   } else {
     fallbackCopy(text, done);
   }
+}
+
+function copyOutput() {
+  copyText($("output").textContent, "✓ 已复制到剪贴板");
+}
+
+function copyDual(which) {
+  copyText(
+    $(which === "bp" ? "bpOutput" : "rpOutput").textContent,
+    `✓ 已复制${which === "bp" ? "行为包" : "资源包"} JSON`
+  );
 }
 
 function fallbackCopy(text, done) {
@@ -979,16 +1176,23 @@ function fallbackCopy(text, done) {
   ta.remove();
 }
 
-function downloadOutput() {
-  const text = $("output").textContent;
+function downloadText(text, filename) {
   const blob = new Blob([text], { type: "application/json;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "manifest.json";
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(a.href);
+}
+
+function downloadOutput() {
+  downloadText($("output").textContent, "manifest.json");
+}
+
+function downloadDual(which) {
+  downloadText($(which === "bp" ? "bpOutput" : "rpOutput").textContent, "manifest.json");
 }
 
 /* ---------- 事件绑定 ---------- */
@@ -999,6 +1203,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (t.classList.contains("dep-kind")) updateDepVisibility(t.closest(".dep-item"));
     if (t.classList.contains("set-type")) updateSettingVisibility(t.closest(".setting-item"));
     if (t.id === "packType" || t.id === "formatVersion") syncVisibility();
+    if (t.id === "dualMode") {
+      if (t.checked) seedRpDefaults();
+      syncVisibility();
+    }
     render();
   });
   document.addEventListener("change", (e) => {
@@ -1007,6 +1215,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (t.classList.contains("dep-kind")) updateDepVisibility(t.closest(".dep-item"));
     if (t.classList.contains("set-type")) updateSettingVisibility(t.closest(".setting-item"));
     if (t.id === "packType" || t.id === "formatVersion") syncVisibility();
+    if (t.id === "dualMode") {
+      if (t.checked) seedRpDefaults();
+      syncVisibility();
+    }
     render();
   });
   syncVisibility();
