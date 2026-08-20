@@ -145,7 +145,7 @@
 <main>
   <section>
     <div class="card">
-      <h2>① 预设 <span class="hint">一键载入官方示例</span></h2>
+      <h2>① 预设 <span class="hint">载入官方示例并自动刷新 UUID</span></h2>
       <div class="btn-row">
         <button class="btn primary" onclick="loadPreset('behavior')">行为包示例</button>
         <button class="btn primary" onclick="loadPreset('resource')">资源包示例</button>
@@ -193,7 +193,7 @@
       </div>
       <div class="btn-row" style="margin-top:-4px">
         <button class="btn" onclick="regenerateAllUuids()">♻ 一键重新生成全部 UUID</button>
-        <span class="note" style="margin:0;align-self:center">包、模块、依赖的 UUID 都会自动填充</span>
+        <span class="note" style="margin:0;align-self:center">刷新包与模块的 UUID；依赖 UUID 需手动填对应资源包</span>
       </div>
       <div class="row-3">
         <div class="field"><label for="verMajor">版本 major</label><input id="verMajor" type="number" min="0" value="1"></div>
@@ -345,7 +345,7 @@
     </div>
     <div class="dep-pack-fields">
       <div class="field" style="margin-bottom:12px">
-        <label>依赖包的 UUID（需与对应资源包 header.uuid 一致，已自动填充请核对）</label>
+        <label>依赖包的 UUID（需与对应资源包 header.uuid 一致，需手动填写）</label>
         <input class="dep-uuid" spellcheck="false" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
       </div>
       <div class="row-3">
@@ -528,8 +528,8 @@ function refreshModuleTypeOptions() {
 function addDepRow(kind, uuid, ver, moduleName, scriptVersion) {
   const tpl = $("depTemplate").content.firstElementChild.cloneNode(true);
   if (kind) tpl.querySelector(".dep-kind").value = kind;
-  const isPack = kind === undefined ? tpl.querySelector(".dep-kind").value === "pack" : kind === "pack";
-  tpl.querySelector(".dep-uuid").value = uuid || (isPack ? uuidv4() : "");
+  /* 依赖包的 UUID 必须等于对应资源包 header.uuid，不能随机生成 */
+  tpl.querySelector(".dep-uuid").value = uuid || "";
   if (ver && ver.length === 3) {
     tpl.querySelector(".dep-ver-major").value = ver[0];
     tpl.querySelector(".dep-ver-minor").value = ver[1];
@@ -546,9 +546,7 @@ function regenerateAllUuids() {
   document.querySelectorAll(".module-item .mod-uuid").forEach((input) => {
     input.value = uuidv4();
   });
-  document.querySelectorAll(".dep-item .dep-uuid").forEach((input) => {
-    input.value = uuidv4();
-  });
+  /* 不刷新依赖 UUID：它必须匹配外部资源包，随机值无意义 */
   render();
 }
 
@@ -880,7 +878,8 @@ function applyManifest(m) {
   const h = m.header || {};
   $("packName").value = h.name || "";
   $("packDesc").value = h.description || "";
-  $("packUuid").value = h.uuid || uuidv4();
+  /* 载入预设时生成全新 UUID，避免直接使用官方示例 UUID 造成冲突 */
+  $("packUuid").value = uuidv4();
   const v = parseVersionString(h.version || [1, 0, 0]);
   $("verMajor").value = v[0] !== undefined ? v[0] : 1;
   $("verMinor").value = v[1] !== undefined ? v[1] : 0;
@@ -898,7 +897,7 @@ function applyManifest(m) {
   $("basePatch").value = bv ? bv[2] : "";
 
   $("moduleList").innerHTML = "";
-  (m.modules || []).forEach((mod) => addModuleRow(mod.uuid, mod.type, mod.version, mod.description, mod.language));
+  (m.modules || []).forEach((mod) => addModuleRow(undefined, mod.type, mod.version, mod.description, mod.language));
   if (!m.modules || !m.modules.length) addModuleRow();
 
   $("depList").innerHTML = "";
