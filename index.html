@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minecraft Bedrock manifest.json 生成器</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1b222c;
+    --panel-2: #232c38;
+    --border: #303b47;
+    --text: #e6edf3;
+    --muted: #9aa7b4;
+    --accent: #57ab5a;
+    --accent-2: #3fb950;
+    --danger: #f85149;
+    --warn: #d29922;
+    --code-bg: #0d1117;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #15202b, #0f1419);
+  }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 18px;
+    padding: 18px 28px 40px;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+  @media (max-width: 980px) {
+    main { grid-template-columns: 1fr; padding: 14px; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: var(--accent-2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .hint { color: var(--muted); font-weight: normal; font-size: 12px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent-2); }
+  input[type="checkbox"] { width: auto; accent-color: var(--accent-2); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .field { min-width: 0; }
+  .uuid-field { display: flex; gap: 6px; }
+  .uuid-field input { font-family: Consolas, monospace; }
+  .btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0b0f14; font-weight: 600; }
+  .btn.primary:hover { background: var(--accent-2); }
+  .btn.small { padding: 4px 8px; font-size: 12px; }
+  .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .item {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .item-head .tag { font-size: 12px; color: var(--muted); }
+  .checks { display: flex; flex-wrap: wrap; gap: 12px; }
+  .checks label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 13px; margin: 0; }
+  .checks code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  .output-panel { position: sticky; top: 14px; align-self: start; }
+  @media (max-width: 980px) { .output-panel { position: static; } }
+  #status { font-size: 13px; margin: 0 0 10px; }
+  #status.ok { color: var(--accent-2); }
+  #status.warn { color: var(--warn); }
+  #warnings { margin: 0 0 10px; padding: 0; list-style: none; font-size: 13px; }
+  #warnings li { color: var(--warn); margin-bottom: 3px; }
+  #warnings li::before { content: "⚠ "; }
+  #output {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: Consolas, "Cascadia Code", monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow: auto;
+    max-height: 70vh;
+    color: #d5e2d8;
+  }
+  .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .note a { color: var(--accent-2); }
+  .hidden { display: none !important; }
+  .inline-label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 13px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⛏ Minecraft Bedrock manifest.json 生成器</h1>
+  <p>面向 Add-on / 资源包 / 行为包 / 皮肤包 / 世界模板开发者的在线清单生成工具。基于 Microsoft Learn 官方文档规范。</p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>① 预设 <span class="hint">一键载入官方示例</span></h2>
+      <div class="btn-row">
+        <button class="btn primary" onclick="loadPreset('behavior')">行为包示例</button>
+        <button class="btn primary" onclick="loadPreset('resource')">资源包示例</button>
+        <button class="btn primary" onclick="loadPreset('skin')">皮肤包示例</button>
+        <button class="btn" onclick="resetAll()">清空表单</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>② 基本信息 <span class="hint">header 段</span></h2>
+      <div class="row">
+        <div class="field">
+          <label for="packType">包类型</label>
+          <select id="packType">
+            <option value="behavior" selected>行为包 Behavior Pack</option>
+            <option value="resource">资源包 Resource Pack</option>
+            <option value="skin">皮肤包 Skin Pack</option>
+            <option value="world_template">世界模板 World Template</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="formatVersion">format_version</label>
+          <select id="formatVersion">
+            <option value="auto" selected>自动（按包类型）</option>
+            <option value="1">1（皮肤包）</option>
+            <option value="2">2（推荐）</option>
+            <option value="3">3（预览版）</option>
+          </select>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label for="packName">包名称 name（必填，游戏内显示）</label>
+        <input id="packName" placeholder="My Awesome Pack">
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label for="packDesc">描述 description（游戏内显示，建议 1-2 行）</label>
+        <input id="packDesc" placeholder="A short description of the pack">
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label for="packUuid">包 UUID header.uuid（必填，需唯一）</label>
+        <div class="uuid-field">
+          <input id="packUuid" spellcheck="false">
+          <button class="btn small" onclick="refreshUuid('packUuid')">重新生成</button>
+        </div>
+      </div>
+      <div class="row-3">
+        <div class="field"><label for="verMajor">版本 major</label><input id="verMajor" type="number" min="0" value="1"></div>
+        <div class="field"><label for="verMinor">版本 minor</label><input id="verMinor" type="number" min="0" value="0"></div>
+        <div class="field"><label for="verPatch">版本 patch</label><input id="verPatch" type="number" min="0" value="0"></div>
+      </div>
+      <div id="engineRow" class="row-3">
+        <div class="field"><label for="minMajor">最低引擎版本 major</label><input id="minMajor" type="number" min="0" value="1"></div>
+        <div class="field"><label for="minMinor">最低引擎版本 minor</label><input id="minMinor" type="number" min="0" value="21"></div>
+        <div class="field"><label for="minPatch">最低引擎版本 patch</label><input id="minPatch" type="number" min="0" value="0"></div>
+      </div>
+      <div id="scopeRow" class="field hidden" style="margin-bottom:12px">
+        <label for="packScope">pack_scope（资源包可用范围）</label>
+        <select id="packScope">
+          <option value="">不输出（等同 any）</option>
+          <option value="any">any（游戏与世界中均可）</option>
+          <option value="global">global（仅游戏全局）</option>
+          <option value="world">world（仅世界内）</option>
+        </select>
+      </div>
+      <div id="templateRow" class="hidden">
+        <label class="inline-label"><input id="allowRandomSeed" type="checkbox"> allow_random_seed（每次创建世界随机种子）</label>
+        <label class="inline-label"><input id="lockTemplateOptions" type="checkbox"> lock_template_options（锁定世界选项）</label>
+        <div class="row-3">
+          <div class="field"><label for="baseMajor">base_game_version major</label><input id="baseMajor" type="number" min="0"></div>
+          <div class="field"><label for="baseMinor">base_game_version minor</label><input id="baseMinor" type="number" min="0"></div>
+          <div class="field"><label for="basePatch">base_game_version patch</label><input id="basePatch" type="number" min="0"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>③ 模块 modules <span class="hint">每个模块需独立 UUID</span></h2>
+      <div id="moduleList"></div>
+      <button class="btn" onclick="addModuleRow()">＋ 添加模块</button>
+    </div>
+
+    <div class="card">
+      <h2>④ 依赖 dependencies <span class="hint">包依赖或脚本模块依赖</span></h2>
+      <div id="depList"></div>
+      <button class="btn" onclick="addDepRow()">＋ 添加依赖</button>
+    </div>
+
+    <div class="card">
+      <h2>⑤ 能力 capabilities <span class="hint">可选功能</span></h2>
+      <div class="checks">
+        <label><input type="checkbox" class="cap" value="chemistry"><code>chemistry</code></label>
+        <label><input type="checkbox" class="cap" value="editorExtension"><code>editorExtension</code></label>
+        <label><input type="checkbox" class="cap" value="experimental_custom_ui"><code>experimental_custom_ui</code></label>
+        <label><input type="checkbox" class="cap" value="raytraced"><code>raytraced</code></label>
+        <label><input type="checkbox" class="cap" value="pbr"><code>pbr</code></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⑥ 元数据 metadata <span class="hint">作者 / 许可 / 链接</span></h2>
+      <div class="field" style="margin-bottom:12px">
+        <label for="metaAuthors">作者 authors（多个用英文逗号分隔）</label>
+        <input id="metaAuthors" placeholder="Alice, Bob">
+      </div>
+      <div class="row">
+        <div class="field"><label for="metaLicense">许可 license</label><input id="metaLicense" placeholder="MIT"></div>
+        <div class="field"><label for="metaUrl">主页 url</label><input id="metaUrl" placeholder="https://example.com"></div>
+      </div>
+      <label class="inline-label"><input id="metaProductType" type="checkbox"> product_type: "addon"（标记为可加入世界的 Add-on）</label>
+      <div class="row" id="generatedRow">
+        <div class="field"><label for="genTool">generated_with 工具名（字母数字 _-，≤32 字符）</label><input id="genTool" placeholder="my_pack_tool"></div>
+        <div class="field"><label for="genVersions">工具版本（逗号分隔，如 1.0.0）</label><input id="genVersions" placeholder="1.0.0"></div>
+      </div>
+    </div>
+
+    <div class="card" id="settingsCard">
+      <h2>⑦ 设置 settings <span class="hint">仅 format_version 3（预览版）</span></h2>
+      <div id="settingList"></div>
+      <button class="btn" onclick="addSettingRow()">＋ 添加设置项</button>
+      <p class="note">类型：label（说明文字）、toggle（开关）、slider（滑块）。仅在 v3 清单中输出。</p>
+    </div>
+  </section>
+
+  <section class="output-panel">
+    <div class="card">
+      <h2>生成的 manifest.json <span class="hint">实时预览</span></h2>
+      <p id="status" class="ok">✓ 配置有效</p>
+      <ul id="warnings"></ul>
+      <div class="btn-row">
+        <button class="btn primary" onclick="copyOutput()">复制 JSON</button>
+        <button class="btn primary" onclick="downloadOutput()">下载 manifest.json</button>
+      </div>
+      <pre id="output"></pre>
+      <p class="note">参考文档：<a href="https://learn.microsoft.com/minecraft/creator/reference/content/addonsreference/packmanifest" target="_blank" rel="noopener">Add-Ons Reference: manifest.json（Microsoft Learn）</a></p>
+    </div>
+  </section>
+</main>
+
+<template id="moduleTemplate">
+  <div class="item module-item">
+    <div class="item-head">
+      <span class="tag">模块</span>
+      <button class="btn small danger" onclick="removeItem(this)">移除</button>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>描述 description（可选）</label>
+        <input class="mod-desc" placeholder="What this module is for">
+      </div>
+      <div class="field">
+        <label>类型 type</label>
+        <select class="mod-type">
+          <option value="data">data（行为包）</option>
+          <option value="resources">resources（资源包）</option>
+          <option value="client_data">client_data（客户端脚本）</option>
+          <option value="world_template">world_template（世界模板）</option>
+          <option value="script">script（脚本）</option>
+          <option value="skin_pack">skin_pack（皮肤包）</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>模块 UUID（必填，与包 UUID 不同）</label>
+      <div class="uuid-field">
+        <input class="mod-uuid" spellcheck="false">
+        <button class="btn small" onclick="refreshUuidFrom(this)">重新生成</button>
+      </div>
+    </div>
+    <div class="row-3">
+      <div class="field"><label>版本 major</label><input class="mod-ver-major" type="number" min="0" value="1"></div>
+      <div class="field"><label>版本 minor</label><input class="mod-ver-minor" type="number" min="0" value="0"></div>
+      <div class="field"><label>版本 patch</label><input class="mod-ver-patch" type="number" min="0" value="0"></div>
+    </div>
+    <div class="field mod-lang-field hidden">
+      <label>语言 language（仅 script 模块，支持 javascript）</label>
+      <input class="mod-lang" value="javascript">
+    </div>
+  </div>
+</template>
+
+<template id="depTemplate">
+  <div class="item dep-item">
+    <div class="item-head">
+      <span class="tag">依赖</span>
+      <button class="btn small danger" onclick="removeItem(this)">移除</button>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>依赖类型</label>
+      <select class="dep-kind">
+        <option value="pack">包依赖（需要另一个包的 UUID）</option>
+        <option value="script">脚本模块依赖（如 @minecraft/server）</option>
+      </select>
+    </div>
+    <div class="dep-pack-fields">
+      <div class="field" style="margin-bottom:12px">
+        <label>依赖包的 UUID（与该包 header.uuid 一致）</label>
+        <input class="dep-uuid" spellcheck="false" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+      </div>
+      <div class="row-3">
+        <div class="field"><label>版本 major</label><input class="dep-ver-major" type="number" min="0" value="1"></div>
+        <div class="field"><label>版本 minor</label><input class="dep-ver-minor" type="number" min="0" value="0"></div>
+        <div class="field"><label>版本 patch</label><input class="dep-ver-patch" type="number" min="0" value="0"></div>
+      </div>
+    </div>
+    <div class="dep-script-fields hidden">
+      <div class="field" style="margin-bottom:12px">
+        <label>模块名称 module_name</label>
+        <input class="dep-module-name" placeholder="@minecraft/server">
+      </div>
+      <div class="field">
+        <label>版本 version（SemVer 字符串）</label>
+        <input class="dep-script-version" placeholder="1.9.0">
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="settingTemplate">
+  <div class="item setting-item">
+    <div class="item-head">
+      <span class="tag">设置项（v3 预览）</span>
+      <button class="btn small danger" onclick="removeItem(this)">移除</button>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>类型</label>
+      <select class="set-type">
+        <option value="label">label（说明文字）</option>
+        <option value="toggle">toggle（开关）</option>
+        <option value="slider">slider（滑块）</option>
+      </select>
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>显示文本 text</label>
+      <input class="set-text" placeholder="玩家可读的说明 / 开关 / 滑块标题">
+    </div>
+    <div class="set-name-field hidden">
+      <div class="field" style="margin-bottom:12px">
+        <label>标识符 name（程序读取用）</label>
+        <input class="set-name" placeholder="my_option">
+      </div>
+    </div>
+    <div class="set-toggle-default hidden">
+      <label class="inline-label"><input class="set-toggle-default-cb" type="checkbox"> 默认开启 default</label>
+    </div>
+    <div class="row-4 set-slider-fields hidden">
+      <div class="field"><label>min</label><input class="set-min" type="number" value="0"></div>
+      <div class="field"><label>max</label><input class="set-max" type="number" value="10"></div>
+      <div class="field"><label>step</label><input class="set-step" type="number" value="1"></div>
+      <div class="field"><label>default</label><input class="set-default" type="number" value="5"></div>
+    </div>
+  </div>
+</template>
+
+<script>
+"use strict";
+
+/* ---------- 工具函数 ---------- */
+function uuidv4() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const s = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
+  return s.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+
+function $(id) { return document.getElementById(id); }
+function val(id) { return $(id).value.trim(); }
+
+function effectiveFormatVersion() {
+  const sel = val("formatVersion");
+  if (sel !== "auto") return parseInt(sel, 10);
+  const type = val("packType");
+  return type === "skin" ? 1 : 2;
+}
+
+function versionObject() {
+  return {
+    major: parseInt(val("verMajor"), 10) || 0,
+    minor: parseInt(val("verMinor"), 10) || 0,
+    patch: parseInt(val("verPatch"), 10) || 0
+  };
+}
+
+function minEngineVersion() {
+  const m = parseInt(val("minMajor"), 10);
+  const i = parseInt(val("minMinor"), 10);
+  const p = parseInt(val("minPatch"), 10);
+  if (isNaN(m) && isNaN(i) && isNaN(p)) return null;
+  return [isNaN(m) ? 0 : m, isNaN(i) ? 0 : i, isNaN(p) ? 0 : p];
+}
+
+function baseGameVersion() {
+  const m = parseInt(val("baseMajor"), 10);
+  const i = parseInt(val("baseMinor"), 10);
+  const p = parseInt(val("basePatch"), 10);
+  if (isNaN(m) && isNaN(i) && isNaN(p)) return null;
+  return [isNaN(m) ? 0 : m, isNaN(i) ? 0 : i, isNaN(p) ? 0 : p];
+}
+
+function toVersion(parts, v3) {
+  const nums = parts.map((n) => (typeof n === "number" ? n : parseInt(n, 10) || 0));
+  return v3 ? nums.join(".") : nums;
+}
+
+function parseVersionString(s) {
+  if (Array.isArray(s)) return s.map((n) => parseInt(n, 10) || 0);
+  return String(s).split(".").map((n) => parseInt(n, 10) || 0);
+}
+
+/* ---------- 模块 / 依赖 / 设置 行管理 ---------- */
+function addModuleRow(uuid, type, ver, desc, lang) {
+  const tpl = $("moduleTemplate").content.firstElementChild.cloneNode(true);
+  tpl.querySelector(".mod-uuid").value = uuid || uuidv4();
+  if (type) tpl.querySelector(".mod-type").value = type;
+  if (ver && ver.length === 3) {
+    tpl.querySelector(".mod-ver-major").value = ver[0];
+    tpl.querySelector(".mod-ver-minor").value = ver[1];
+    tpl.querySelector(".mod-ver-patch").value = ver[2];
+  }
+  if (desc) tpl.querySelector(".mod-desc").value = desc;
+  if (lang) tpl.querySelector(".mod-lang").value = lang;
+  $("moduleList").appendChild(tpl);
+  updateModuleLangVisibility(tpl);
+}
+
+function addDepRow(kind, uuid, ver, moduleName, scriptVersion) {
+  const tpl = $("depTemplate").content.firstElementChild.cloneNode(true);
+  if (kind) tpl.querySelector(".dep-kind").value = kind;
+  if (uuid) tpl.querySelector(".dep-uuid").value = uuid;
+  if (ver && ver.length === 3) {
+    tpl.querySelector(".dep-ver-major").value = ver[0];
+    tpl.querySelector(".dep-ver-minor").value = ver[1];
+    tpl.querySelector(".dep-ver-patch").value = ver[2];
+  }
+  if (moduleName) tpl.querySelector(".dep-module-name").value = moduleName;
+  if (scriptVersion) tpl.querySelector(".dep-script-version").value = scriptVersion;
+  $("depList").appendChild(tpl);
+  updateDepVisibility(tpl);
+}
+
+function addSettingRow(item) {
+  const tpl = $("settingTemplate").content.firstElementChild.cloneNode(true);
+  if (item) {
+    tpl.querySelector(".set-type").value = item.type || "label";
+    tpl.querySelector(".set-text").value = item.text || "";
+    if (item.name !== undefined) tpl.querySelector(".set-name").value = item.name;
+    if (item.type === "toggle") tpl.querySelector(".set-toggle-default-cb").checked = !!item.default;
+    if (item.type === "slider") {
+      tpl.querySelector(".set-min").value = item.min !== undefined ? item.min : 0;
+      tpl.querySelector(".set-max").value = item.max !== undefined ? item.max : 10;
+      tpl.querySelector(".set-step").value = item.step !== undefined ? item.step : 1;
+      tpl.querySelector(".set-default").value = item.default !== undefined ? item.default : 5;
+    }
+  }
+  $("settingList").appendChild(tpl);
+  updateSettingVisibility(tpl);
+}
+
+function removeItem(btn) { btn.closest(".item").remove(); render(); }
+function refreshUuid(id) { $(id).value = uuidv4(); render(); }
+function refreshUuidFrom(btn) {
+  const input = btn.closest(".uuid-field").querySelector("input");
+  input.value = uuidv4();
+  render();
+}
+
+function updateModuleLangVisibility(item) {
+  const type = item.querySelector(".mod-type").value;
+  item.querySelector(".mod-lang-field").classList.toggle("hidden", type !== "script");
+}
+
+function updateDepVisibility(item) {
+  const kind = item.querySelector(".dep-kind").value;
+  item.querySelector(".dep-pack-fields").classList.toggle("hidden", kind !== "pack");
+  item.querySelector(".dep-script-fields").classList.toggle("hidden", kind !== "script");
+}
+
+function updateSettingVisibility(item) {
+  const type = item.querySelector(".set-type").value;
+  item.querySelector(".set-name-field").classList.toggle("hidden", type === "label");
+  item.querySelector(".set-toggle-default").classList.toggle("hidden", type !== "toggle");
+  item.querySelector(".set-slider-fields").classList.toggle("hidden", type !== "slider");
+}
+
+/* ---------- 构建 manifest ---------- */
+function buildManifest() {
+  const warnings = [];
+  const fmt = effectiveFormatVersion();
+  const v3 = fmt === 3;
+  const packType = val("packType");
+
+  const header = { name: val("packName"), uuid: val("packUuid") };
+  const desc = val("packDesc");
+  if (desc) header.description = desc;
+  header.version = toVersion([versionObject().major, versionObject().minor, versionObject().patch], v3);
+
+  const minVer = minEngineVersion();
+  if (minVer) header.min_engine_version = toVersion(minVer, v3);
+  else if (["behavior", "resource", "world_template"].includes(packType)) {
+    warnings.push("行为包 / 资源包 / 世界模板必须填写 min_engine_version（header.min_engine_version）。");
+  }
+
+  if (packType === "resource") {
+    const scope = val("packScope");
+    if (scope) header.pack_scope = scope;
+  }
+  if (packType === "world_template") {
+    if ($("allowRandomSeed").checked) header.allow_random_seed = true;
+    if ($("lockTemplateOptions").checked) header.lock_template_options = true;
+    const base = baseGameVersion();
+    if (base) header.base_game_version = toVersion(base, v3);
+  }
+
+  const modules = [];
+  document.querySelectorAll(".module-item").forEach((row) => {
+    const mod = {
+      type: row.querySelector(".mod-type").value,
+      uuid: row.querySelector(".mod-uuid").value.trim(),
+      version: toVersion([
+        parseInt(row.querySelector(".mod-ver-major").value, 10) || 0,
+        parseInt(row.querySelector(".mod-ver-minor").value, 10) || 0,
+        parseInt(row.querySelector(".mod-ver-patch").value, 10) || 0
+      ], v3)
+    };
+    const d = row.querySelector(".mod-desc").value.trim();
+    if (d) mod.description = d;
+    if (mod.type === "script") {
+      mod.language = row.querySelector(".mod-lang").value.trim() || "javascript";
+      if (mod.language !== "javascript") warnings.push("script 模块的 language 目前仅支持 javascript。");
+    }
+    if (!UUID_RE.test(mod.uuid)) warnings.push(`模块 UUID 无效：${mod.uuid || "(空)"}`);
+    modules.push(mod);
+  });
+
+  const deps = [];
+  document.querySelectorAll(".dep-item").forEach((row) => {
+    const kind = row.querySelector(".dep-kind").value;
+    if (kind === "pack") {
+      const dep = {
+        uuid: row.querySelector(".dep-uuid").value.trim(),
+        version: toVersion([
+          parseInt(row.querySelector(".dep-ver-major").value, 10) || 0,
+          parseInt(row.querySelector(".dep-ver-minor").value, 10) || 0,
+          parseInt(row.querySelector(".dep-ver-patch").value, 10) || 0
+        ], v3)
+      };
+      if (!UUID_RE.test(dep.uuid)) warnings.push(`依赖包 UUID 无效：${dep.uuid || "(空)"}`);
+      deps.push(dep);
+    } else {
+      const dep = {
+        module_name: row.querySelector(".dep-module-name").value.trim(),
+        version: row.querySelector(".dep-script-version").value.trim()
+      };
+      if (!dep.module_name) warnings.push("脚本模块依赖缺少 module_name（如 @minecraft/server）。");
+      if (!SEMVER_RE.test(dep.version)) warnings.push(`脚本模块依赖版本应为 SemVer 字符串（如 1.9.0）：${dep.version || "(空)"}`);
+      deps.push(dep);
+    }
+  });
+
+  const capabilities = Array.from(document.querySelectorAll(".cap:checked")).map((c) => c.value);
+
+  const meta = {};
+  const authors = val("metaAuthors").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+  if (authors.length) meta.authors = authors;
+  if (val("metaLicense")) meta.license = val("metaLicense");
+  if (val("metaUrl")) meta.url = val("metaUrl");
+  if ($("metaProductType").checked) meta.product_type = "addon";
+  const tool = val("genTool");
+  const genVers = val("genVersions").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+  if (tool) {
+    if (!/^[a-zA-Z0-9_-]{1,32}$/.test(tool)) {
+      warnings.push("generated_with 工具名只能包含字母、数字、下划线、连字符且不超过 32 字符。");
+    } else {
+      meta.generated_with = { [tool]: genVers.length ? genVers : ["1.0.0"] };
+    }
+  }
+
+  const settings = [];
+  if (v3) {
+    document.querySelectorAll(".setting-item").forEach((row) => {
+      const type = row.querySelector(".set-type").value;
+      const text = row.querySelector(".set-text").value.trim();
+      if (type === "label") {
+        if (text) settings.push({ type, text });
+      } else if (type === "toggle") {
+        const name = row.querySelector(".set-name").value.trim();
+        const def = row.querySelector(".set-toggle-default-cb").checked;
+        if (text && name) settings.push({ type, text, name, default: def });
+        else warnings.push("toggle 设置项需填写 text 与 name。");
+      } else {
+        const name = row.querySelector(".set-name").value.trim();
+        const min = parseFloat(row.querySelector(".set-min").value);
+        const max = parseFloat(row.querySelector(".set-max").value);
+        const step = parseFloat(row.querySelector(".set-step").value);
+        const def = parseFloat(row.querySelector(".set-default").value);
+        if (text && name && !isNaN(min) && !isNaN(max) && !isNaN(step) && !isNaN(def)) {
+          settings.push({ type, text, name, min, max, step, default: def });
+        } else {
+          warnings.push("slider 设置项需填写 text、name、min、max、step、default。");
+        }
+      }
+    });
+  }
+
+  /* 校验必填与 UUID 唯一性 */
+  if (!header.name) warnings.push("包名称（header.name）为必填项。");
+  if (!UUID_RE.test(header.uuid)) warnings.push("包 UUID（header.uuid）无效或为空。");
+  if (!modules.length) warnings.push("至少需要一个模块（modules）。");
+
+  const allUuids = [header.uuid, ...modules.map((m) => m.uuid), ...deps.filter((d) => d.uuid).map((d) => d.uuid)];
+  const seen = new Set();
+  allUuids.forEach((u) => {
+    if (u && seen.has(u.toLowerCase())) warnings.push(`UUID 重复使用：${u}`);
+    if (u) seen.add(u.toLowerCase());
+  });
+
+  const manifest = { format_version: fmt, header, modules };
+  if (deps.length) manifest.dependencies = deps;
+  if (capabilities.length) manifest.capabilities = capabilities;
+  if (Object.keys(meta).length) manifest.metadata = meta;
+  if (settings.length) manifest.settings = settings;
+
+  return { manifest, warnings };
+}
+
+/* ---------- 渲染 ---------- */
+function render() {
+  const { manifest, warnings } = buildManifest();
+  $("output").textContent = JSON.stringify(manifest, null, 4) + "\n";
+  const status = $("status");
+  const list = $("warnings");
+  list.innerHTML = "";
+  if (warnings.length) {
+    status.textContent = `⚠ 存在 ${warnings.length} 个问题，请检查（仍可预览输出）`;
+    status.className = "warn";
+    warnings.forEach((w) => {
+      const li = document.createElement("li");
+      li.textContent = w;
+      list.appendChild(li);
+    });
+  } else {
+    status.textContent = "✓ 配置有效";
+    status.className = "ok";
+  }
+}
+
+/* ---------- 联动显示 ---------- */
+function syncVisibility() {
+  const type = val("packType");
+  $("scopeRow").classList.toggle("hidden", type !== "resource");
+  $("templateRow").classList.toggle("hidden", type !== "world_template");
+  const fmt = effectiveFormatVersion();
+  $("settingsCard").classList.toggle("hidden", fmt !== 3);
+}
+
+/* ---------- 预设 ---------- */
+const PRESETS = {
+  behavior: {
+    format_version: 2,
+    header: {
+      description: "Example vanilla behavior pack",
+      name: "Vanilla Behavior Pack",
+      uuid: "ee649bcf-256c-4013-9068-6a802b89d756",
+      version: [1, 0, 0],
+      min_engine_version: [1, 20, 0]
+    },
+    modules: [
+      { description: "Example behavior pack module", type: "data", uuid: "fa6e90c8-c925-460f-8155-c8a60b753caa", version: [1, 0, 0] },
+      { description: "Example client scripts module", type: "client_data", uuid: "c05a992e-482a-455f-898c-58bbb4975e47", version: [1, 0, 0] }
+    ],
+    dependencies: [
+      { uuid: "66c6e9a8-3093-462a-9c36-dbb052165822", version: [1, 0, 0] },
+      { module_name: "@minecraft/server", version: "1.9.0" }
+    ],
+    metadata: {
+      authors: ["exampleAuthor"],
+      license: "MIT",
+      url: "http://www.contoso.com",
+      generated_with: { example_tool: ["1.0.0", "1.1.0"] }
+    }
+  },
+  resource: {
+    format_version: 2,
+    header: {
+      description: "Example vanilla resource pack",
+      name: "Vanilla Resource Pack",
+      uuid: "66c6e9a8-3093-462a-9c36-dbb052165822",
+      pack_scope: "world",
+      version: [1, 0, 0],
+      min_engine_version: [1, 20, 0]
+    },
+    modules: [
+      { description: "Example vanilla resource pack", type: "resources", uuid: "743f6949-53be-44b6-b326-398005028819", version: [1, 0, 0] }
+    ]
+  },
+  skin: {
+    format_version: 1,
+    header: {
+      name: "Example Skin Pack",
+      description: "Example vanilla skin pack",
+      uuid: "3c6a74f2-8e4b-4f8a-9c2e-1d5b6a7f8e90",
+      version: [1, 0, 0]
+    },
+    modules: [
+      { type: "skin_pack", uuid: "5a9d3e7c-2f4b-4d6a-9e8b-3c1a2b4d5e6f", version: [1, 0, 0] }
+    ]
+  }
+};
+
+function loadPreset(name) {
+  applyManifest(PRESETS[name]);
+  render();
+}
+
+function applyManifest(m) {
+  const fmt = m.format_version || 2;
+  $("formatVersion").value = String(fmt);
+
+  let type = "behavior";
+  if (m.modules && m.modules.length) {
+    const t = m.modules[0].type;
+    if (t === "resources") type = "resource";
+    else if (t === "world_template") type = "world_template";
+    else if (t === "skin_pack") type = "skin";
+    else if (t === "data") type = "behavior";
+  }
+  $("packType").value = type;
+
+  const h = m.header || {};
+  $("packName").value = h.name || "";
+  $("packDesc").value = h.description || "";
+  $("packUuid").value = h.uuid || uuidv4();
+  const v = parseVersionString(h.version || [1, 0, 0]);
+  $("verMajor").value = v[0] !== undefined ? v[0] : 1;
+  $("verMinor").value = v[1] !== undefined ? v[1] : 0;
+  $("verPatch").value = v[2] !== undefined ? v[2] : 0;
+  const mv = h.min_engine_version ? parseVersionString(h.min_engine_version) : null;
+  $("minMajor").value = mv ? mv[0] : "";
+  $("minMinor").value = mv ? mv[1] : "";
+  $("minPatch").value = mv ? mv[2] : "";
+  $("packScope").value = h.pack_scope || "";
+  $("allowRandomSeed").checked = !!h.allow_random_seed;
+  $("lockTemplateOptions").checked = !!h.lock_template_options;
+  const bv = h.base_game_version ? parseVersionString(h.base_game_version) : null;
+  $("baseMajor").value = bv ? bv[0] : "";
+  $("baseMinor").value = bv ? bv[1] : "";
+  $("basePatch").value = bv ? bv[2] : "";
+
+  $("moduleList").innerHTML = "";
+  (m.modules || []).forEach((mod) => addModuleRow(mod.uuid, mod.type, mod.version, mod.description, mod.language));
+  if (!m.modules || !m.modules.length) addModuleRow();
+
+  $("depList").innerHTML = "";
+  (m.dependencies || []).forEach((dep) => {
+    if (dep.module_name) addDepRow("script", null, null, dep.module_name, dep.version);
+    else addDepRow("pack", dep.uuid, dep.version);
+  });
+
+  document.querySelectorAll(".cap").forEach((cb) => { cb.checked = false; });
+  (m.capabilities || []).forEach((c) => {
+    const cb = document.querySelector(`.cap[value="${c}"]`);
+    if (cb) cb.checked = true;
+  });
+
+  const meta = m.metadata || {};
+  $("metaAuthors").value = (meta.authors || []).join(", ");
+  $("metaLicense").value = meta.license || "";
+  $("metaUrl").value = meta.url || "";
+  $("metaProductType").checked = meta.product_type === "addon";
+  const gw = meta.generated_with || {};
+  const toolName = Object.keys(gw)[0] || "";
+  $("genTool").value = toolName;
+  $("genVersions").value = toolName ? (gw[toolName] || []).join(", ") : "";
+
+  $("settingList").innerHTML = "";
+  (m.settings || []).forEach((item) => addSettingRow(item));
+
+  syncVisibility();
+}
+
+function resetAll() {
+  $("packType").value = "behavior";
+  $("formatVersion").value = "auto";
+  $("packName").value = "";
+  $("packDesc").value = "";
+  $("packUuid").value = uuidv4();
+  $("verMajor").value = 1; $("verMinor").value = 0; $("verPatch").value = 0;
+  $("minMajor").value = 1; $("minMinor").value = 21; $("minPatch").value = 0;
+  $("packScope").value = "";
+  $("allowRandomSeed").checked = false;
+  $("lockTemplateOptions").checked = false;
+  $("baseMajor").value = ""; $("baseMinor").value = ""; $("basePatch").value = "";
+  $("moduleList").innerHTML = "";
+  addModuleRow();
+  $("depList").innerHTML = "";
+  $("settingList").innerHTML = "";
+  document.querySelectorAll(".cap").forEach((cb) => { cb.checked = false; });
+  $("metaAuthors").value = ""; $("metaLicense").value = ""; $("metaUrl").value = "";
+  $("metaProductType").checked = false;
+  $("genTool").value = ""; $("genVersions").value = "";
+  syncVisibility();
+  render();
+}
+
+/* ---------- 复制 / 下载 ---------- */
+function copyOutput() {
+  const text = $("output").textContent;
+  const done = () => {
+    const st = $("status");
+    st.textContent = "✓ 已复制到剪贴板";
+    st.className = "ok";
+    setTimeout(render, 1800);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) { /* ignore */ }
+  ta.remove();
+}
+
+function downloadOutput() {
+  const text = $("output").textContent;
+  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "manifest.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- 事件绑定 ---------- */
+document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.classList.contains("mod-type")) updateModuleLangVisibility(t.closest(".module-item"));
+    if (t.classList.contains("dep-kind")) updateDepVisibility(t.closest(".dep-item"));
+    if (t.classList.contains("set-type")) updateSettingVisibility(t.closest(".setting-item"));
+    if (t.id === "packType" || t.id === "formatVersion") syncVisibility();
+    render();
+  });
+  document.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.classList.contains("mod-type")) updateModuleLangVisibility(t.closest(".module-item"));
+    if (t.classList.contains("dep-kind")) updateDepVisibility(t.closest(".dep-item"));
+    if (t.classList.contains("set-type")) updateSettingVisibility(t.closest(".setting-item"));
+    if (t.id === "packType" || t.id === "formatVersion") syncVisibility();
+    render();
+  });
+  syncVisibility();
+  resetAll();
+});
+</script>
+</body>
+</html>
