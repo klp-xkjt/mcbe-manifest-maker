@@ -170,4 +170,73 @@ set("packName", "");
 assert.ok(warnings.some((w) => w.includes("UUID")), "应提示 UUID 无效");
 assert.ok(warnings.some((w) => w.includes("名称")), "应提示名称必填");
 
+/* ---- 用例 4：皮肤包（format_version 1，无 min_engine_version） ---- */
+set("packType", "skin");
+set("formatVersion", "auto");
+set("packName", "Tutorial Skin Pack");
+set("packDesc", "ignored");
+set("packUuid", "3c6a74f2-8e4b-4f8a-9c2e-1d5b6a7f8e90");
+set("verMajor", 1); set("verMinor", 0); set("verPatch", 0);
+set("minMajor", 1); set("minMinor", 21); set("minPatch", 0);
+moduleRows.length = 0;
+moduleRows.push(
+  mkRow({
+    ".mod-type": "skin_pack",
+    ".mod-uuid": "5a9d3e7c-2f4b-4d6a-9e8b-3c1a2b4d5e6f",
+    ".mod-ver-major": 1, ".mod-ver-minor": 0, ".mod-ver-patch": 0
+  })
+);
+depRows.length = 0;
+caps.length = 0;
+settingRows.length = 0;
+({ manifest, warnings } = api.buildManifest());
+assert.deepEqual(warnings, [], "皮肤包不应有警告");
+assert.equal(manifest.format_version, 1, "皮肤包自动使用 format_version 1");
+assert.equal(manifest.header.min_engine_version, undefined, "皮肤包不应输出 min_engine_version");
+assert.equal(manifest.header.description, undefined, "皮肤包不输出 description");
+assert.equal(manifest.modules[0].type, "skin_pack");
+
+/* ---- 用例 5：行为包不允许 resources 模块类型 ---- */
+set("packType", "behavior");
+set("formatVersion", "2");
+moduleRows.length = 0;
+moduleRows.push(
+  mkRow({
+    ".mod-type": "resources",
+    ".mod-uuid": "fa6e90c8-c925-460f-8155-c8a60b753c11",
+    ".mod-ver-major": 1, ".mod-ver-minor": 0, ".mod-ver-patch": 0
+  })
+);
+({ warnings } = api.buildManifest());
+assert.ok(warnings.some((w) => w.includes("不支持模块类型")), "应提示模块类型与包类型不匹配");
+
+/* ---- 用例 6：世界模板（base_game_version + lock_template_options） ---- */
+set("packType", "world_template");
+set("formatVersion", "auto");
+set("packName", "My World Template");
+set("packUuid", "aa649bcf-256c-4013-9068-6a802b89d701");
+getEl("lockTemplateOptions").checked = true;
+set("baseMajor", 1); set("baseMinor", 20); set("basePatch", 0);
+moduleRows.length = 0;
+moduleRows.push(
+  mkRow({
+    ".mod-type": "world_template",
+    ".mod-uuid": "fa6e90c8-c925-460f-8155-c8a60b753c22",
+    ".mod-ver-major": 1, ".mod-ver-minor": 0, ".mod-ver-patch": 0
+  })
+);
+({ manifest, warnings } = api.buildManifest());
+assert.deepEqual(warnings, [], "完整世界模板不应有警告");
+assert.equal(manifest.format_version, 2);
+assert.equal(manifest.header.lock_template_options, true);
+assert.deepEqual(manifest.header.base_game_version, [1, 20, 0]);
+assert.equal(manifest.modules[0].type, "world_template");
+
+/* 缺 base_game_version 与 lock_template_options 时应提示 */
+getEl("lockTemplateOptions").checked = false;
+set("baseMajor", ""); set("baseMinor", ""); set("basePatch", "");
+({ warnings } = api.buildManifest());
+assert.ok(warnings.some((w) => w.includes("lock_template_options")), "应提示 lock_template_options 必需");
+assert.ok(warnings.some((w) => w.includes("base_game_version")), "应提示 base_game_version 建议");
+
 console.log("All generator tests passed ✓");

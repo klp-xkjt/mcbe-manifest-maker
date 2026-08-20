@@ -180,7 +180,7 @@
         <label for="packName">包名称 name（必填，游戏内显示）</label>
         <input id="packName" placeholder="My Awesome Pack">
       </div>
-      <div class="field" style="margin-bottom:12px">
+      <div id="descField" class="field" style="margin-bottom:12px">
         <label for="packDesc">描述 description（游戏内显示，建议 1-2 行）</label>
         <input id="packDesc" placeholder="A short description of the pack">
       </div>
@@ -416,6 +416,31 @@ function uuidv4() {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
+/* 各包类型允许的模块类型（依据 Microsoft Learn 官方文档示例） */
+const MODULE_TYPES = {
+  behavior: [
+    ["data", "data（行为包主模块）"],
+    ["client_data", "client_data（客户端脚本模块）"],
+    ["script", "script（脚本模块）"]
+  ],
+  resource: [
+    ["resources", "resources（资源包主模块）"]
+  ],
+  skin: [
+    ["skin_pack", "skin_pack（皮肤包模块）"]
+  ],
+  world_template: [
+    ["world_template", "world_template（世界模板模块）"]
+  ]
+};
+
+const PACK_LABELS = {
+  behavior: "行为包",
+  resource: "资源包",
+  skin: "皮肤包",
+  world_template: "世界模板"
+};
+
 function $(id) { return document.getElementById(id); }
 function val(id) { return $(id).value.trim(); }
 
@@ -463,8 +488,9 @@ function parseVersionString(s) {
 /* ---------- 模块 / 依赖 / 设置 行管理 ---------- */
 function addModuleRow(uuid, type, ver, desc, lang) {
   const tpl = $("moduleTemplate").content.firstElementChild.cloneNode(true);
+  const typeSelect = tpl.querySelector(".mod-type");
+  applyModuleTypeOptions(typeSelect, type);
   tpl.querySelector(".mod-uuid").value = uuid || uuidv4();
-  if (type) tpl.querySelector(".mod-type").value = type;
   if (ver && ver.length === 3) {
     tpl.querySelector(".mod-ver-major").value = ver[0];
     tpl.querySelector(".mod-ver-minor").value = ver[1];
@@ -474,6 +500,25 @@ function addModuleRow(uuid, type, ver, desc, lang) {
   if (lang) tpl.querySelector(".mod-lang").value = lang;
   $("moduleList").appendChild(tpl);
   updateModuleLangVisibility(tpl);
+}
+
+function applyModuleTypeOptions(select, keep) {
+  const pack = val("packType");
+  const opts = MODULE_TYPES[pack] || MODULE_TYPES.behavior;
+  select.innerHTML = "";
+  opts.forEach(([v, label]) => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = label;
+    select.appendChild(o);
+  });
+  if (keep && opts.some(([v]) => v === keep)) select.value = keep;
+}
+
+function refreshModuleTypeOptions() {
+  document.querySelectorAll(".module-item .mod-type").forEach((sel) => {
+    applyModuleTypeOptions(sel, sel.value);
+  });
 }
 
 function addDepRow(kind, uuid, ver, moduleName, scriptVersion) {
@@ -541,16 +586,30 @@ function buildManifest() {
   const fmt = effectiveFormatVersion();
   const v3 = fmt === 3;
   const packType = val("packType");
+  const packLabel = PACK_LABELS[packType] || packType;
+
+  /* format_version 与包类型的匹配检查 */
+  if (packType === "skin" && fmt !== 1) {
+    warnings.push("皮肤包（skin pack）应使用 format_version 1。");
+  }
+  if (["behavior", "resource"].includes(packType) && fmt === 1) {
+    warnings.push("行为包 / 资源包应使用 format_version 2。");
+  }
+  if (packType === "world_template" && fmt === 1) {
+    warnings.push("世界模板应使用 format_version 2。");
+  }
 
   const header = { name: val("packName"), uuid: val("packUuid") };
   const desc = val("packDesc");
-  if (desc) header.description = desc;
+  if (desc && packType !== "skin") header.description = desc;
   header.version = toVersion([versionObject().major, versionObject().minor, versionObject().patch], v3);
 
   const minVer = minEngineVersion();
-  if (minVer) header.min_engine_version = toVersion(minVer, v3);
-  else if (["behavior", "resource", "world_template"].includes(packType)) {
-    warnings.push("行为包 / 资源包 / 世界模板必须填写 min_engine_version（header.min_engine_version）。");
+  if (["behavior", "resource", "world_template"].includes(packType) && minVer) {
+    header.min_engine_version = toVersion(minVer, v3);
+  }
+  if (["behavior", "resource"].includes(packType) && !minVer) {
+    warnings.push("行为包 / 资源包必须填写 min_engine_version（header.min_engine_version）。");
   }
 
   if (packType === "resource") {
@@ -562,6 +621,12 @@ function buildManifest() {
     if ($("lockTemplateOptions").checked) header.lock_template_options = true;
     const base = baseGameVersion();
     if (base) header.base_game_version = toVersion(base, v3);
+    if (!$("lockTemplateOptions").checked) {
+      warnings.push("世界模板官方文档说明 lock_template_options 为必需字段。");
+    }
+    if (!base) {
+      warnings.push("世界模板建议设置 base_game_version，锁定模板依赖的基础游戏版本。");
+    }
   }
 
   const modules = [];
@@ -577,6 +642,10 @@ function buildManifest() {
     };
     const d = row.querySelector(".mod-desc").value.trim();
     if (d) mod.description = d;
+    const allowedTypes = (MODULE_TYPES[packType] || []).map(([v]) => v);
+    if (allowedTypes.length && !allowedTypes.includes(mod.type)) {
+      warnings.push(`${packLabel}不支持模块类型 "${mod.type}"，应使用：${allowedTypes.join(" / ")}。`);
+    }
     if (mod.type === "script") {
       mod.language = row.querySelector(".mod-lang").value.trim() || "javascript";
       if (mod.language !== "javascript") warnings.push("script 模块的 language 目前仅支持 javascript。");
@@ -702,8 +771,11 @@ function syncVisibility() {
   const type = val("packType");
   $("scopeRow").classList.toggle("hidden", type !== "resource");
   $("templateRow").classList.toggle("hidden", type !== "world_template");
+  $("engineRow").classList.toggle("hidden", type === "skin");
+  $("descField").classList.toggle("hidden", type === "skin");
   const fmt = effectiveFormatVersion();
   $("settingsCard").classList.toggle("hidden", fmt !== 3);
+  refreshModuleTypeOptions();
 }
 
 /* ---------- 预设 ---------- */

@@ -35,8 +35,24 @@ node tests/generator.test.mjs
 - `metadata`：`authors`、`license`、`url`、`product_type`、`generated_with`
 - `settings`：v3 预览版的 `label` / `toggle` / `slider` 设置项
 
+## 各类型清单的字段差异
+
+不同包类型的 `manifest.json` 字段并不完全相同（依据 Microsoft Learn 官方示例整理），生成器会按所选包类型自动约束与校验：
+
+| 包类型 | format_version | header 特有字段 | 模块类型 | 其他差异 |
+| --- | --- | --- | --- | --- |
+| 行为包 | 2 | `min_engine_version`（必填） | `data` / `client_data` / `script` | 常用 `dependencies` 关联配套资源包或脚本模块 |
+| 资源包 | 2 | `min_engine_version`（必填）、`pack_scope`（可选） | `resources` | 无 dependencies |
+| 皮肤包 | 1 | 无 `min_engine_version`、无 `description` | `skin_pack` | 结构最简单 |
+| 世界模板 | 2 | `base_game_version`、`lock_template_options`（必需）、`allow_random_seed` | `world_template` | 用基础游戏版本锁定模板依赖的原版内容 |
+
+生成器会给出针对性校验：例如行为包不允许 `resources` 模块、皮肤包应使用 `format_version` 1、世界模板必须设置 `lock_template_options` 等。
+
 ## 规范来源
 
 - [Add-Ons Reference: manifest.json](https://learn.microsoft.com/minecraft/creator/reference/content/addonsreference/packmanifest)（Microsoft Learn，经由 Microsoft Learn MCP 检索确认）
 - [Pack Manifest Documentation](https://learn.microsoft.com/minecraft/creator/reference/content/manifestreference/packmanifestdocument)
+- [Comprehensive List of Add-On Pack Contents](https://learn.microsoft.com/minecraft/creator/documents/comprehensivepackcontents)（各类型 manifest 对照示例）
+- [Packaging a Skin Pack](https://learn.microsoft.com/minecraft/creator/documents/packagingaskinpack)
+- [Introduction to Behavior Packs (from Scratch)](https://learn.microsoft.com/minecraft/creator/documents/behaviorpackfromscratch)
 - [Introduction to Resource Packs](https://learn.microsoft.com/minecraft/creator/documents/resourcepack)
