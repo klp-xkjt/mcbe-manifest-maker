@@ -2,6 +2,14 @@
 
 一个离线可用的单文件网页工具，帮助 Minecraft：Bedrock Edition 的 Add-on / 资源包 / 行为包 / 皮肤包 / 世界模板开发者快速生成 `manifest.json`。
 
+> 🤖 本项目由 AI（DeepSeek-V4-Flash）生成
+
+## 项目信息
+
+- 项目类型：AI 生成（AI-generated）
+- 生成时间：2026-08-20
+- 生成方式：DeepSeek-V4-Flash 依据 Microsoft Learn 官方文档编写并测试
+
 ## 使用
 
 直接用浏览器打开 [index.html](index.html) 即可，无需安装依赖、无需联网。
