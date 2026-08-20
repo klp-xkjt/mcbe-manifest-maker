@@ -227,14 +227,14 @@
       <button class="btn" onclick="addModuleRow()">＋ 添加模块</button>
     </div>
 
-    <div class="card">
-      <h2>④ 依赖 dependencies <span class="hint">包依赖或脚本模块依赖</span></h2>
+    <div class="card" id="depCard">
+      <h2>④ 依赖 dependencies <span class="hint">仅行为包使用：关联资源包或脚本模块</span></h2>
       <div id="depList"></div>
       <button class="btn" onclick="addDepRow()">＋ 添加依赖</button>
     </div>
 
-    <div class="card">
-      <h2>⑤ 能力 capabilities <span class="hint">可选功能</span></h2>
+    <div class="card" id="capCard">
+      <h2>⑤ 能力 capabilities <span class="hint">行为包 / 资源包可选功能</span></h2>
       <div class="checks">
         <label><input type="checkbox" class="cap" value="chemistry"><code>chemistry</code></label>
         <label><input type="checkbox" class="cap" value="editorExtension"><code>editorExtension</code></label>
@@ -244,8 +244,8 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>⑥ 元数据 metadata <span class="hint">作者 / 许可 / 链接</span></h2>
+    <div class="card" id="metaCard">
+      <h2>⑥ 元数据 metadata <span class="hint">除皮肤包外可选：作者 / 许可 / 链接</span></h2>
       <div class="field" style="margin-bottom:12px">
         <label for="metaAuthors">作者 authors（多个用英文逗号分隔）</label>
         <input id="metaAuthors" placeholder="Alice, Bob">
@@ -655,45 +655,52 @@ function buildManifest() {
   });
 
   const deps = [];
-  document.querySelectorAll(".dep-item").forEach((row) => {
-    const kind = row.querySelector(".dep-kind").value;
-    if (kind === "pack") {
-      const dep = {
-        uuid: row.querySelector(".dep-uuid").value.trim(),
-        version: toVersion([
-          parseInt(row.querySelector(".dep-ver-major").value, 10) || 0,
-          parseInt(row.querySelector(".dep-ver-minor").value, 10) || 0,
-          parseInt(row.querySelector(".dep-ver-patch").value, 10) || 0
-        ], v3)
-      };
-      if (!UUID_RE.test(dep.uuid)) warnings.push(`依赖包 UUID 无效：${dep.uuid || "(空)"}`);
-      deps.push(dep);
-    } else {
-      const dep = {
-        module_name: row.querySelector(".dep-module-name").value.trim(),
-        version: row.querySelector(".dep-script-version").value.trim()
-      };
-      if (!dep.module_name) warnings.push("脚本模块依赖缺少 module_name（如 @minecraft/server）。");
-      if (!SEMVER_RE.test(dep.version)) warnings.push(`脚本模块依赖版本应为 SemVer 字符串（如 1.9.0）：${dep.version || "(空)"}`);
-      deps.push(dep);
-    }
-  });
+  if (packType === "behavior") {
+    document.querySelectorAll(".dep-item").forEach((row) => {
+      const kind = row.querySelector(".dep-kind").value;
+      if (kind === "pack") {
+        const dep = {
+          uuid: row.querySelector(".dep-uuid").value.trim(),
+          version: toVersion([
+            parseInt(row.querySelector(".dep-ver-major").value, 10) || 0,
+            parseInt(row.querySelector(".dep-ver-minor").value, 10) || 0,
+            parseInt(row.querySelector(".dep-ver-patch").value, 10) || 0
+          ], v3)
+        };
+        if (!UUID_RE.test(dep.uuid)) warnings.push(`依赖包 UUID 无效：${dep.uuid || "(空)"}`);
+        deps.push(dep);
+      } else {
+        const dep = {
+          module_name: row.querySelector(".dep-module-name").value.trim(),
+          version: row.querySelector(".dep-script-version").value.trim()
+        };
+        if (!dep.module_name) warnings.push("脚本模块依赖缺少 module_name（如 @minecraft/server）。");
+        if (!SEMVER_RE.test(dep.version)) warnings.push(`脚本模块依赖版本应为 SemVer 字符串（如 1.9.0）：${dep.version || "(空)"}`);
+        deps.push(dep);
+      }
+    });
+  }
 
-  const capabilities = Array.from(document.querySelectorAll(".cap:checked")).map((c) => c.value);
+  let capabilities = [];
+  if (["behavior", "resource"].includes(packType)) {
+    capabilities = Array.from(document.querySelectorAll(".cap:checked")).map((c) => c.value);
+  }
 
   const meta = {};
-  const authors = val("metaAuthors").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-  if (authors.length) meta.authors = authors;
-  if (val("metaLicense")) meta.license = val("metaLicense");
-  if (val("metaUrl")) meta.url = val("metaUrl");
-  if ($("metaProductType").checked) meta.product_type = "addon";
-  const tool = val("genTool");
-  const genVers = val("genVersions").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-  if (tool) {
-    if (!/^[a-zA-Z0-9_-]{1,32}$/.test(tool)) {
-      warnings.push("generated_with 工具名只能包含字母、数字、下划线、连字符且不超过 32 字符。");
-    } else {
-      meta.generated_with = { [tool]: genVers.length ? genVers : ["1.0.0"] };
+  if (packType !== "skin") {
+    const authors = val("metaAuthors").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    if (authors.length) meta.authors = authors;
+    if (val("metaLicense")) meta.license = val("metaLicense");
+    if (val("metaUrl")) meta.url = val("metaUrl");
+    if ($("metaProductType").checked) meta.product_type = "addon";
+    const tool = val("genTool");
+    const genVers = val("genVersions").split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    if (tool) {
+      if (!/^[a-zA-Z0-9_-]{1,32}$/.test(tool)) {
+        warnings.push("generated_with 工具名只能包含字母、数字、下划线、连字符且不超过 32 字符。");
+      } else {
+        meta.generated_with = { [tool]: genVers.length ? genVers : ["1.0.0"] };
+      }
     }
   }
 
@@ -773,6 +780,9 @@ function syncVisibility() {
   $("templateRow").classList.toggle("hidden", type !== "world_template");
   $("engineRow").classList.toggle("hidden", type === "skin");
   $("descField").classList.toggle("hidden", type === "skin");
+  $("depCard").classList.toggle("hidden", type !== "behavior");
+  $("capCard").classList.toggle("hidden", !["behavior", "resource"].includes(type));
+  $("metaCard").classList.toggle("hidden", type === "skin");
   const fmt = effectiveFormatVersion();
   $("settingsCard").classList.toggle("hidden", fmt !== 3);
   refreshModuleTypeOptions();

@@ -189,12 +189,27 @@ moduleRows.push(
 depRows.length = 0;
 caps.length = 0;
 settingRows.length = 0;
+/* 故意填入本不该属于皮肤包的内容，验证会被忽略 */
+depRows.push(
+  mkRow({
+    ".dep-kind": "pack",
+    ".dep-uuid": "66c6e9a8-3093-462a-9c36-dbb052165822",
+    ".dep-ver-major": 1, ".dep-ver-minor": 0, ".dep-ver-patch": 0
+  })
+);
+caps.push({ value: "pbr", checked: true });
+set("metaAuthors", "Alice");
+set("genTool", "test_tool");
+set("genVersions", "1.0.0");
 ({ manifest, warnings } = api.buildManifest());
 assert.deepEqual(warnings, [], "皮肤包不应有警告");
 assert.equal(manifest.format_version, 1, "皮肤包自动使用 format_version 1");
 assert.equal(manifest.header.min_engine_version, undefined, "皮肤包不应输出 min_engine_version");
 assert.equal(manifest.header.description, undefined, "皮肤包不输出 description");
 assert.equal(manifest.modules[0].type, "skin_pack");
+assert.equal(manifest.dependencies, undefined, "皮肤包不应输出 dependencies");
+assert.equal(manifest.capabilities, undefined, "皮肤包不应输出 capabilities");
+assert.equal(manifest.metadata, undefined, "皮肤包不应输出 metadata");
 
 /* ---- 用例 5：行为包不允许 resources 模块类型 ---- */
 set("packType", "behavior");
@@ -231,6 +246,8 @@ assert.equal(manifest.format_version, 2);
 assert.equal(manifest.header.lock_template_options, true);
 assert.deepEqual(manifest.header.base_game_version, [1, 20, 0]);
 assert.equal(manifest.modules[0].type, "world_template");
+assert.equal(manifest.capabilities, undefined, "世界模板不应输出 capabilities");
+assert.equal(manifest.dependencies, undefined, "世界模板不应输出 dependencies");
 
 /* 缺 base_game_version 与 lock_template_options 时应提示 */
 getEl("lockTemplateOptions").checked = false;
@@ -238,5 +255,36 @@ set("baseMajor", ""); set("baseMinor", ""); set("basePatch", "");
 ({ warnings } = api.buildManifest());
 assert.ok(warnings.some((w) => w.includes("lock_template_options")), "应提示 lock_template_options 必需");
 assert.ok(warnings.some((w) => w.includes("base_game_version")), "应提示 base_game_version 建议");
+
+/* ---- 用例 7：资源包不输出 dependencies，但允许 capabilities ---- */
+set("packType", "resource");
+set("formatVersion", "2");
+set("packName", "My Resource Pack");
+set("packUuid", "66c6e9a8-3093-462a-9c36-dbb052165899");
+set("packScope", "world");
+moduleRows.length = 0;
+moduleRows.push(
+  mkRow({
+    ".mod-type": "resources",
+    ".mod-uuid": "743f6949-53be-44b6-b326-398005028800",
+    ".mod-ver-major": 1, ".mod-ver-minor": 0, ".mod-ver-patch": 0
+  })
+);
+depRows.length = 0;
+depRows.push(
+  mkRow({
+    ".dep-kind": "pack",
+    ".dep-uuid": "66c6e9a8-3093-462a-9c36-dbb052165822",
+    ".dep-ver-major": 1, ".dep-ver-minor": 0, ".dep-ver-patch": 0
+  })
+);
+caps.length = 0;
+caps.push({ value: "pbr", checked: true }, { value: "raytraced", checked: false });
+({ manifest, warnings } = api.buildManifest());
+assert.deepEqual(warnings, [], "资源包不应有警告");
+assert.equal(manifest.header.pack_scope, "world");
+assert.equal(manifest.modules[0].type, "resources");
+assert.equal(manifest.dependencies, undefined, "资源包不应输出 dependencies");
+assert.deepEqual(manifest.capabilities, ["pbr"], "资源包允许 capabilities");
 
 console.log("All generator tests passed ✓");
